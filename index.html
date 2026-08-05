@@ -17,9 +17,9 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // إعدادات مشروعك من الصورة
+        // إعدادات مشروعك
         const firebaseConfig = {
             apiKey: "AIzaSyBdenjIK9hihgVKoBIuqSIbCDbWbaf9png",
             authDomain: "ghada-food.firebaseapp.com",
@@ -30,8 +30,14 @@
         };
 
         const app = initializeApp(firebaseConfig);
+        
+        // تجهيز أدوات فايربيز لاستخدامها في واجهة React
         window.auth = getAuth(app);
         window.db = getFirestore(app);
+        window.firebaseAPI = {
+            onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
+            collection, addDoc, doc, setDoc, onSnapshot, query, orderBy
+        };
     </script>
 </head>
 <body class="bg-orange-50 font-sans">
@@ -40,14 +46,155 @@
     <!-- كود React الأساسي -->
     <script type="text/babel">
         const { useState, useEffect } = React;
+        const { 
+            onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
+            doc, setDoc 
+        } = window.firebaseAPI;
 
         function App() {
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [isAdmin, setIsAdmin] = useState(false);
+
+            useEffect(() => {
+                // مراقبة حالة تسجيل الدخول (لحفظ الجلسة)
+                const unsubscribe = onAuthStateChanged(window.auth, (currentUser) => {
+                    setUser(currentUser);
+                    if (currentUser) {
+                        // التحقق مما إذا كان المستخدم هو الإدارة
+                        setIsAdmin(currentUser.email === "ghada@ghada.com");
+                    }
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            if (loading) {
+                return (
+                    <div className="flex items-center justify-center min-h-screen text-teal-600 font-bold text-xl">
+                        جاري التحميل...
+                    </div>
+                );
+            }
+
+            // توجيه المستخدم حسب دوره
+            return user ? (
+                isAdmin ? <AdminDashboard user={user} /> : <CustomerDashboard user={user} />
+            ) : (
+                <Login />
+            );
+        }
+
+        // واجهة تسجيل الدخول
+        function Login() {
+            const [username, setUsername] = useState("");
+            const [password, setPassword] = useState("");
+            const [isRegister, setIsRegister] = useState(false);
+            const [error, setError] = useState("");
+            const [loading, setLoading] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError("");
+                setLoading(true);
+                
+                // فايربيز يطلب إيميل، لذا نحول اسم المستخدم لإيميل مخفي
+                const email = username.trim().toLowerCase() + "@ghada.com";
+                let pass = password;
+                
+                // معالجة استثناء باسورد الإدارة لأنه أقل من 6 أحرف
+                if (username === "ghada" && password === "19991") {
+                    pass = "19991_admin"; 
+                } else if (password.length < 6) {
+                    setError("كلمة المرور للعملاء يجب أن تكون 6 أحرف أو أرقام على الأقل");
+                    setLoading(false);
+                    return;
+                }
+
+                try {
+                    if (isRegister && username !== "ghada") {
+                        // إنشاء حساب عميل جديد
+                        const userCredential = await createUserWithEmailAndPassword(window.auth, email, pass);
+                        // حفظ العميل في قاعدة بيانات app_users
+                        await setDoc(doc(window.db, "app_users", userCredential.user.uid), {
+                            username: username,
+                            role: "customer",
+                            createdAt: new Date().toISOString()
+                        });
+                    } else {
+                        // تسجيل دخول (عميل أو إدارة)
+                        await signInWithEmailAndPassword(window.auth, email, pass);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    if (err.code === "auth/email-already-in-use") setError("هذا الاسم مسجل بالفعل، يرجى تسجيل الدخول.");
+                    else if (err.code === "auth/invalid-credential") setError("بيانات الدخول غير صحيحة.");
+                    else setError("حدث خطأ، تأكد من صحة البيانات.");
+                }
+                setLoading(false);
+            };
+
             return (
-                <div className="flex flex-col items-center justify-center min-h-screen">
-                    <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-sm w-full border-t-4 border-teal-500">
-                        <h1 className="text-3xl font-bold text-teal-700 mb-2">أكلات غادة</h1>
-                        <p className="text-orange-500 font-medium mb-6">اللي تتمناه وزيادة 🍲</p>
-                        <p className="text-gray-600 text-sm">جاري تجهيز واجهة تسجيل الدخول...</p>
+                <div className="flex flex-col items-center justify-center min-h-screen p-4">
+                    <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm border-t-4 border-teal-500">
+                        <h2 className="text-2xl font-bold text-teal-700 mb-2 text-center">أكلات غادة 🍲</h2>
+                        <h3 className="text-gray-500 mb-6 text-center text-sm">
+                            {isRegister ? "إنشاء حساب كعميل جديد" : "تسجيل الدخول للمتابعة"}
+                        </h3>
+                        
+                        {error && <p className="text-red-500 text-sm mb-4 text-center font-bold bg-red-50 p-2 rounded">{error}</p>}
+                        
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-gray-700 mb-1 font-medium">اسم المستخدم</label>
+                                <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" 
+                                    placeholder="اكتب اسمك هنا" />
+                            </div>
+                            <div>
+                                <label className="block text-gray-700 mb-1 font-medium">كلمة المرور</label>
+                                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" 
+                                    placeholder="******" />
+                            </div>
+                            <button type="submit" disabled={loading} className="w-full bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700 transition font-bold">
+                                {loading ? "جاري التحميل..." : (isRegister ? "إنشاء الحساب" : "تسجيل الدخول")}
+                            </button>
+                        </form>
+
+                        <button onClick={() => {setIsRegister(!isRegister); setError("");}} className="w-full text-sm text-teal-600 mt-4 hover:underline font-medium">
+                            {isRegister ? "لديك حساب بالفعل؟ سجل دخولك" : "ليس لديك حساب؟ أنشئ حساباً كعميل"}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // واجهة الإدارة المؤقتة
+        function AdminDashboard({ user }) {
+            return (
+                <div className="p-8">
+                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <h1 className="text-2xl font-bold text-teal-700">لوحة تحكم الإدارة (غادة) 👩‍🍳</h1>
+                        <button onClick={() => signOut(window.auth)} className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg font-bold transition">تسجيل الخروج</button>
+                    </div>
+                    <div className="bg-teal-50 p-6 rounded-lg text-teal-800">
+                        مرحباً غادة! (هذه الواجهة المؤقتة.. في الخطوة القادمة سنضيف هنا إضافة المنتجات وجدول الطلبات).
+                    </div>
+                </div>
+            );
+        }
+
+        // واجهة العميل المؤقتة
+        function CustomerDashboard({ user }) {
+            return (
+                <div className="p-8">
+                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <h1 className="text-2xl font-bold text-orange-500">أكلات غادة - اللي تتمناه وزيادة 🍲</h1>
+                        <button onClick={() => signOut(window.auth)} className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg font-bold transition">تسجيل الخروج</button>
+                    </div>
+                    <div className="bg-orange-50 p-6 rounded-lg text-orange-800">
+                        مرحباً بك كعميل! (هذه الواجهة المؤقتة.. في الخطوة القادمة سنضيف هنا المتجر وسلة المشتريات).
                     </div>
                 </div>
             );

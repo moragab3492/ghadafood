@@ -5,21 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>أكلات غادة للأكل البيتي</title>
     
-    <!-- استدعاء Tailwind CSS للتصميم -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- استدعاء React -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- إعدادات Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // إعدادات مشروعك
         const firebaseConfig = {
             apiKey: "AIzaSyBdenjIK9hihgVKoBIuqSIbCDbWbaf9png",
             authDomain: "ghada-food.firebaseapp.com",
@@ -30,8 +25,6 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        
-        // تجهيز أدوات فايربيز لاستخدامها في واجهة React
         window.auth = getAuth(app);
         window.db = getFirestore(app);
         window.firebaseAPI = {
@@ -43,12 +36,11 @@
 <body class="bg-orange-50 font-sans">
     <div id="root"></div>
 
-    <!-- كود React الأساسي -->
     <script type="text/babel">
         const { useState, useEffect } = React;
         const { 
             onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
-            doc, setDoc 
+            doc, setDoc, collection, addDoc, onSnapshot, query, orderBy 
         } = window.firebaseAPI;
 
         function App() {
@@ -57,11 +49,9 @@
             const [isAdmin, setIsAdmin] = useState(false);
 
             useEffect(() => {
-                // مراقبة حالة تسجيل الدخول (لحفظ الجلسة)
                 const unsubscribe = onAuthStateChanged(window.auth, (currentUser) => {
                     setUser(currentUser);
                     if (currentUser) {
-                        // التحقق مما إذا كان المستخدم هو الإدارة
                         setIsAdmin(currentUser.email === "ghada@ghada.com");
                     }
                     setLoading(false);
@@ -69,23 +59,13 @@
                 return () => unsubscribe();
             }, []);
 
-            if (loading) {
-                return (
-                    <div className="flex items-center justify-center min-h-screen text-teal-600 font-bold text-xl">
-                        جاري التحميل...
-                    </div>
-                );
-            }
+            if (loading) return <div className="flex items-center justify-center min-h-screen text-teal-600 font-bold text-xl">جاري التحميل...</div>;
 
-            // توجيه المستخدم حسب دوره
             return user ? (
                 isAdmin ? <AdminDashboard user={user} /> : <CustomerDashboard user={user} />
-            ) : (
-                <Login />
-            );
+            ) : <Login />;
         }
 
-        // واجهة تسجيل الدخول
         function Login() {
             const [username, setUsername] = useState("");
             const [password, setPassword] = useState("");
@@ -98,11 +78,9 @@
                 setError("");
                 setLoading(true);
                 
-                // فايربيز يطلب إيميل، لذا نحول اسم المستخدم لإيميل مخفي
                 const email = username.trim().toLowerCase() + "@ghada.com";
                 let pass = password;
                 
-                // معالجة استثناء باسورد الإدارة لأنه أقل من 6 أحرف
                 if (username === "ghada" && password === "19991") {
                     pass = "19991_admin"; 
                 } else if (password.length < 6) {
@@ -113,23 +91,16 @@
 
                 try {
                     if (isRegister && username !== "ghada") {
-                        // إنشاء حساب عميل جديد
                         const userCredential = await createUserWithEmailAndPassword(window.auth, email, pass);
-                        // حفظ العميل في قاعدة بيانات app_users
                         await setDoc(doc(window.db, "app_users", userCredential.user.uid), {
-                            username: username,
-                            role: "customer",
-                            createdAt: new Date().toISOString()
+                            username: username, role: "customer", createdAt: new Date().toISOString()
                         });
                     } else {
-                        // تسجيل دخول (عميل أو إدارة)
                         await signInWithEmailAndPassword(window.auth, email, pass);
                     }
                 } catch (err) {
-                    console.error(err);
                     if (err.code === "auth/email-already-in-use") setError("هذا الاسم مسجل بالفعل، يرجى تسجيل الدخول.");
-                    else if (err.code === "auth/invalid-credential") setError("بيانات الدخول غير صحيحة.");
-                    else setError("حدث خطأ، تأكد من صحة البيانات.");
+                    else setError("البيانات غير صحيحة، تأكد من الاسم وكلمة المرور.");
                 }
                 setLoading(false);
             };
@@ -138,30 +109,24 @@
                 <div className="flex flex-col items-center justify-center min-h-screen p-4">
                     <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm border-t-4 border-teal-500">
                         <h2 className="text-2xl font-bold text-teal-700 mb-2 text-center">أكلات غادة 🍲</h2>
-                        <h3 className="text-gray-500 mb-6 text-center text-sm">
-                            {isRegister ? "إنشاء حساب كعميل جديد" : "تسجيل الدخول للمتابعة"}
-                        </h3>
-                        
+                        <h3 className="text-gray-500 mb-6 text-center text-sm">{isRegister ? "إنشاء حساب كعميل جديد" : "تسجيل الدخول للمتابعة"}</h3>
                         {error && <p className="text-red-500 text-sm mb-4 text-center font-bold bg-red-50 p-2 rounded">{error}</p>}
                         
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-gray-700 mb-1 font-medium">اسم المستخدم</label>
                                 <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" 
-                                    placeholder="اكتب اسمك هنا" />
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" placeholder="اكتب اسمك هنا" />
                             </div>
                             <div>
                                 <label className="block text-gray-700 mb-1 font-medium">كلمة المرور</label>
                                 <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" 
-                                    placeholder="******" />
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" placeholder="******" />
                             </div>
                             <button type="submit" disabled={loading} className="w-full bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700 transition font-bold">
                                 {loading ? "جاري التحميل..." : (isRegister ? "إنشاء الحساب" : "تسجيل الدخول")}
                             </button>
                         </form>
-
                         <button onClick={() => {setIsRegister(!isRegister); setError("");}} className="w-full text-sm text-teal-600 mt-4 hover:underline font-medium">
                             {isRegister ? "لديك حساب بالفعل؟ سجل دخولك" : "ليس لديك حساب؟ أنشئ حساباً كعميل"}
                         </button>
@@ -170,31 +135,100 @@
             );
         }
 
-        // واجهة الإدارة المؤقتة
         function AdminDashboard({ user }) {
+            const [products, setProducts] = useState([]);
+            const [name, setName] = useState("");
+            const [price, setPrice] = useState("");
+            const [desc, setDesc] = useState("");
+
+            useEffect(() => {
+                const q = query(collection(window.db, "products"), orderBy("createdAt", "desc"));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                });
+                return () => unsubscribe();
+            }, []);
+
+            const handleAddProduct = async (e) => {
+                e.preventDefault();
+                if(!name || !price) return;
+                await addDoc(collection(window.db, "products"), {
+                    name, price: Number(price), desc, createdAt: new Date().toISOString()
+                });
+                setName(""); setPrice(""); setDesc("");
+            };
+
             return (
-                <div className="p-8">
+                <div className="p-4 md:p-8 max-w-4xl mx-auto">
                     <div className="flex justify-between items-center mb-6 border-b pb-4">
-                        <h1 className="text-2xl font-bold text-teal-700">لوحة تحكم الإدارة (غادة) 👩‍🍳</h1>
-                        <button onClick={() => signOut(window.auth)} className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg font-bold transition">تسجيل الخروج</button>
+                        <h1 className="text-2xl font-bold text-teal-700">لوحة الإدارة 👩‍🍳</h1>
+                        <button onClick={() => signOut(window.auth)} className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg font-bold transition">خروج</button>
                     </div>
-                    <div className="bg-teal-50 p-6 rounded-lg text-teal-800">
-                        مرحباً غادة! (هذه الواجهة المؤقتة.. في الخطوة القادمة سنضيف هنا إضافة المنتجات وجدول الطلبات).
+                    
+                    <div className="bg-white p-6 rounded-lg shadow mb-8 border-t-4 border-teal-500">
+                        <h2 className="text-xl font-bold mb-4 text-gray-800">إضافة أكلة جديدة للمنيو</h2>
+                        <form onSubmit={handleAddProduct} className="flex flex-col md:flex-row gap-4">
+                            <input type="text" placeholder="اسم الأكلة (مثال: مكرونة بشاميل)" required value={name} onChange={e => setName(e.target.value)} className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
+                            <input type="number" placeholder="السعر (جنية)" required value={price} onChange={e => setPrice(e.target.value)} className="w-full md:w-32 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
+                            <input type="text" placeholder="تفاصيل (اختياري)" value={desc} onChange={e => setDesc(e.target.value)} className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
+                            <button type="submit" className="bg-teal-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-teal-700">إضافة</button>
+                        </form>
+                    </div>
+
+                    <h2 className="text-xl font-bold mb-4 text-gray-800">المنيو الحالي ({products.length})</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {products.map(p => (
+                            <div key={p.id} className="bg-white p-4 rounded-lg shadow flex justify-between items-center border-r-4 border-orange-400">
+                                <div>
+                                    <h3 className="font-bold text-lg text-teal-800">{p.name}</h3>
+                                    <p className="text-gray-500 text-sm">{p.desc}</p>
+                                </div>
+                                <div className="text-xl font-bold text-orange-600">{p.price} ج</div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             );
         }
 
-        // واجهة العميل المؤقتة
         function CustomerDashboard({ user }) {
+            const [products, setProducts] = useState([]);
+
+            useEffect(() => {
+                const q = query(collection(window.db, "products"), orderBy("createdAt", "desc"));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                });
+                return () => unsubscribe();
+            }, []);
+
             return (
-                <div className="p-8">
+                <div className="p-4 md:p-8 max-w-4xl mx-auto">
                     <div className="flex justify-between items-center mb-6 border-b pb-4">
-                        <h1 className="text-2xl font-bold text-orange-500">أكلات غادة - اللي تتمناه وزيادة 🍲</h1>
-                        <button onClick={() => signOut(window.auth)} className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg font-bold transition">تسجيل الخروج</button>
+                        <h1 className="text-2xl font-bold text-orange-600">أكلات غادة 🍲</h1>
+                        <button onClick={() => signOut(window.auth)} className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg font-bold transition">خروج</button>
                     </div>
-                    <div className="bg-orange-50 p-6 rounded-lg text-orange-800">
-                        مرحباً بك كعميل! (هذه الواجهة المؤقتة.. في الخطوة القادمة سنضيف هنا المتجر وسلة المشتريات).
+                    
+                    <h2 className="text-xl font-bold mb-4 text-gray-800">المنيو الطازج اليوم</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {products.length === 0 ? (
+                            <p className="text-gray-500">جاري تجهيز الأكلات، المنيو فارغ حالياً...</p>
+                        ) : (
+                            products.map(p => (
+                                <div key={p.id} className="bg-white p-4 rounded-lg shadow flex justify-between items-center border-r-4 border-teal-500">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-teal-800">{p.name}</h3>
+                                        <p className="text-gray-500 text-sm">{p.desc}</p>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <span className="text-xl font-bold text-orange-600">{p.price} ج</span>
+                                        <button className="bg-orange-100 text-orange-700 px-3 py-1 rounded text-sm font-bold hover:bg-orange-200">
+                                            (قريباً) أضف للسلة
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             );

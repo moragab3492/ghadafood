@@ -14,7 +14,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, setDoc, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBdenjIK9hihgVKoBIuqSIbCDbWbaf9png",
@@ -28,11 +27,9 @@
         const app = initializeApp(firebaseConfig);
         window.auth = getAuth(app);
         window.db = getFirestore(app);
-        window.storage = getStorage(app);
         window.firebaseAPI = {
             onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
-            collection, addDoc, doc, setDoc, onSnapshot, query, orderBy, updateDoc, deleteDoc, where,
-            ref, uploadBytes, getDownloadURL
+            collection, addDoc, doc, setDoc, onSnapshot, query, orderBy, updateDoc, deleteDoc, where
         };
     </script>
 </head>
@@ -40,22 +37,13 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
         const { 
             onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
-            doc, setDoc, collection, addDoc, onSnapshot, query, orderBy, updateDoc, deleteDoc, where,
-            ref, uploadBytes, getDownloadURL
+            doc, setDoc, collection, addDoc, onSnapshot, query, orderBy, updateDoc, deleteDoc, where
         } = window.firebaseAPI;
 
-        // قائمة حالات الطلب لتستخدمها الإدارة
-        const ORDER_STATUSES = [
-            "قيد التجهيز",
-            "جاري الطهي والإعداد",
-            "جاهز للتغليف",
-            "تم التعبئة",
-            "جاهز للارسال والتسليم",
-            "تم التسليم"
-        ];
+        const ORDER_STATUSES = ["قيد التجهيز", "جاري الطهي والإعداد", "جاهز للتغليف", "تم التعبئة", "جاهز للارسال والتسليم", "تم التسليم"];
 
         function App() {
             const [user, setUser] = useState(null);
@@ -75,14 +63,11 @@
                 return () => unsubscribe();
             }, []);
 
-            if (loading) return <div className="flex items-center justify-center min-h-screen text-teal-600 font-bold text-xl">جاري التحميل...</div>;
-
-            return user ? (
-                isAdmin ? <AdminDashboard user={user} /> : <CustomerDashboard user={user} username={username} />
-            ) : <Login />;
+            if (loading) return <div className="flex items-center justify-center min-h-screen text-teal-600 font-bold">جاري التحميل...</div>;
+            return user ? (isAdmin ? <AdminDashboard user={user} /> : <CustomerDashboard user={user} username={username} />) : <Login />;
         }
 
-        // --- واجهة تسجيل الدخول ---
+        // --- تسجيل الدخول ---
         function Login() {
             const [username, setUsername] = useState("");
             const [password, setPassword] = useState("");
@@ -102,25 +87,21 @@
                 try {
                     if (isRegister && username !== "ghada") {
                         const userCredential = await createUserWithEmailAndPassword(window.auth, email, pass);
-                        await setDoc(doc(window.db, "app_users", userCredential.user.uid), { username, role: "customer", createdAt: new Date().toISOString() });
-                    } else {
-                        await signInWithEmailAndPassword(window.auth, email, pass);
-                    }
-                } catch (err) {
-                    setError("البيانات غير صحيحة، أو الحساب مسجل بالفعل.");
-                }
+                        await setDoc(doc(window.db, "app_users", userCredential.user.uid), { uid: userCredential.user.uid, username, role: "customer" });
+                    } else await signInWithEmailAndPassword(window.auth, email, pass);
+                } catch (err) { setError("البيانات غير صحيحة، أو الحساب مسجل بالفعل."); }
                 setLoading(false);
             };
 
             return (
-                <div className="flex flex-col items-center justify-center min-h-screen p-4">
+                <div className="flex items-center justify-center min-h-screen p-4">
                     <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm border-t-4 border-teal-500">
                         <h2 className="text-2xl font-bold text-teal-700 mb-2 text-center">أكلات غادة 🍲</h2>
                         <h3 className="text-gray-500 mb-6 text-center text-sm">{isRegister ? "إنشاء حساب عميل" : "تسجيل الدخول"}</h3>
                         {error && <p className="text-red-500 text-sm mb-4 text-center font-bold bg-red-50 p-2 rounded">{error}</p>}
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-teal-500 outline-none" placeholder="اسم المستخدم" />
-                            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-teal-500 outline-none" placeholder="كلمة المرور" />
+                            <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-4 py-2 border rounded-lg" placeholder="اسم المستخدم" />
+                            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg" placeholder="كلمة المرور" />
                             <button type="submit" disabled={loading} className="w-full bg-teal-600 text-white py-2 rounded-lg font-bold">{loading ? "جاري..." : (isRegister ? "إنشاء الحساب" : "دخول")}</button>
                         </form>
                         <button onClick={() => {setIsRegister(!isRegister); setError("");}} className="w-full text-sm text-teal-600 mt-4 font-medium">{isRegister ? "سجل دخولك" : "أنشئ حساباً كعميل"}</button>
@@ -129,273 +110,296 @@
             );
         }
 
-        // --- لوحة الإدارة ---
-        function AdminDashboard({ user }) {
-            const [products, setProducts] = useState([]);
-            const [orders, setOrders] = useState([]);
-            const [name, setName] = useState("");
-            const [price, setPrice] = useState("");
-            const [desc, setDesc] = useState("");
-            const [imageFile, setImageFile] = useState(null);
-            const [uploading, setUploading] = useState(false);
+        // --- مكون الدردشة ---
+        function ChatBox({ currentUserId, chatWithId, chatWithName, isAdmin }) {
+            const [messages, setMessages] = useState([]);
+            const [newMessage, setNewMessage] = useState("");
+            const bottomRef = useRef(null);
 
             useEffect(() => {
-                const unsubProducts = onSnapshot(query(collection(window.db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
-                    setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                // جلب الرسائل الخاصة بهذا العميل
+                const q = query(collection(window.db, "messages"), where("customerId", "==", isAdmin ? chatWithId : currentUserId), orderBy("createdAt", "asc"));
+                const unsub = onSnapshot(q, (snapshot) => {
+                    setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
                 });
-                const unsubOrders = onSnapshot(query(collection(window.db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
-                    setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                return () => unsub();
+            }, [chatWithId, currentUserId]);
+
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                if (!newMessage.trim()) return;
+                await addDoc(collection(window.db, "messages"), {
+                    customerId: isAdmin ? chatWithId : currentUserId,
+                    senderId: currentUserId,
+                    text: newMessage,
+                    createdAt: new Date().toISOString()
                 });
-                return () => { unsubProducts(); unsubOrders(); };
+                setNewMessage("");
+            };
+
+            return (
+                <div className="bg-white rounded-lg shadow-lg border flex flex-col h-[500px]">
+                    <div className="bg-teal-600 text-white p-3 font-bold rounded-t-lg">
+                        {isAdmin ? `دردشة مع: ${chatWithName}` : "الدعم الفني والشكاوى 💬"}
+                    </div>
+                    <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-50">
+                        {messages.length === 0 && <p className="text-center text-gray-400 mt-10">لا توجد رسائل بعد...</p>}
+                        {messages.map(msg => (
+                            <div key={msg.id} className={`flex ${msg.senderId === currentUserId ? "justify-end" : "justify-start"}`}>
+                                <div className={`px-4 py-2 rounded-lg max-w-[75%] ${msg.senderId === currentUserId ? "bg-teal-500 text-white rounded-tr-none" : "bg-gray-200 text-gray-800 rounded-tl-none"}`}>
+                                    {msg.text}
+                                </div>
+                            </div>
+                        ))}
+                        <div ref={bottomRef} />
+                    </div>
+                    <form onSubmit={sendMessage} className="p-3 bg-white border-t flex gap-2">
+                        <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} className="flex-1 px-3 py-2 border rounded outline-none focus:border-teal-500" placeholder="اكتب رسالتك..." />
+                        <button type="submit" className="bg-teal-600 text-white px-4 py-2 rounded font-bold">إرسال</button>
+                    </form>
+                </div>
+            );
+        }
+
+        // --- لوحة الإدارة ---
+        function AdminDashboard({ user }) {
+            const [activeTab, setActiveTab] = useState("orders"); // orders, products, customers
+            const [products, setProducts] = useState([]);
+            const [orders, setOrders] = useState([]);
+            const [customers, setCustomers] = useState([]);
+            const [selectedCustomer, setSelectedCustomer] = useState(null);
+            
+            // إضافة منتج
+            const [name, setName] = useState(""); const [price, setPrice] = useState(""); const [desc, setDesc] = useState(""); const [imageUrl, setImageUrl] = useState("");
+
+            useEffect(() => {
+                const unsubP = onSnapshot(query(collection(window.db, "products"), orderBy("createdAt", "desc")), (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                const unsubO = onSnapshot(query(collection(window.db, "orders"), orderBy("createdAt", "desc")), (snap) => setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                const unsubC = onSnapshot(query(collection(window.db, "app_users"), where("role", "==", "customer")), (snap) => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                return () => { unsubP(); unsubO(); unsubC(); };
             }, []);
 
             const handleAddProduct = async (e) => {
                 e.preventDefault();
-                if(!name || !price) return;
-                setUploading(true);
-                
-                let imageUrl = "";
-                if (imageFile) {
-                    try {
-                        const storageRef = ref(window.storage, `products/${Date.now()}_${imageFile.name}`);
-                        const snapshot = await uploadBytes(storageRef, imageFile);
-                        imageUrl = await getDownloadURL(snapshot.ref);
-                    } catch (error) {
-                        alert("حدث خطأ أثناء رفع الصورة، سيتم إضافة الأكلة بدونها.");
-                    }
-                }
-
-                await addDoc(collection(window.db, "products"), {
-                    name, price: Number(price), desc, imageUrl, createdAt: new Date().toISOString()
-                });
-                
-                setName(""); setPrice(""); setDesc(""); setImageFile(null);
-                setUploading(false);
+                await addDoc(collection(window.db, "products"), { name, price: Number(price), desc, imageUrl, createdAt: new Date().toISOString() });
+                setName(""); setPrice(""); setDesc(""); setImageUrl("");
             };
 
-            const handleDeleteProduct = async (id) => {
-                if(confirm("حذف هذه الأكلة؟")) await deleteDoc(doc(window.db, "products", id));
-            };
-
-            const handleUpdateOrderStatus = async (id, newStatus) => {
-                await updateDoc(doc(window.db, "orders", id), { status: newStatus });
-            };
+            const handleUpdateOrderStatus = async (id, newStatus) => await updateDoc(doc(window.db, "orders", id), { status: newStatus });
+            const cancelOrder = async (id) => { if(confirm("تأكيد إلغاء الطلب؟")) await updateDoc(doc(window.db, "orders", id), { status: "تم الإلغاء" }); };
 
             return (
                 <div className="p-4 md:p-8 max-w-6xl mx-auto">
-                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                         <h1 className="text-2xl font-bold text-teal-700">لوحة الإدارة 👩‍🍳</h1>
-                        <button onClick={() => signOut(window.auth)} className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold">خروج</button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* إدارة الطلبات */}
-                        <div>
-                            <h2 className="text-xl font-bold mb-4 text-gray-800">الطلبات الحالية ({orders.filter(o => o.status !== "تم التسليم").length})</h2>
-                            <div className="space-y-4">
-                                {orders.map(order => (
-                                    <div key={order.id} className={`p-4 rounded-lg shadow border-r-4 ${order.status === "تم التسليم" ? "bg-gray-50 border-gray-400" : "bg-white border-orange-500"}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <h3 className="font-bold text-teal-800">{order.customerName}</h3>
-                                                <p className="text-sm text-gray-500">📞 {order.phone || "غير متوفر"}</p>
-                                            </div>
-                                            <span className="font-bold text-lg text-orange-600">{order.totalPrice} ج</span>
-                                        </div>
-                                        <ul className="text-sm text-gray-600 mb-4 border-b pb-2">
-                                            {order.items.map((item, idx) => <li key={idx}>- {item.name}</li>)}
-                                        </ul>
-                                        <div className="flex justify-between items-center">
-                                            <select 
-                                                value={order.status} 
-                                                onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
-                                                className="bg-gray-100 border px-2 py-1 rounded text-sm font-bold outline-none text-teal-700"
-                                            >
-                                                {ORDER_STATUSES.map(status => (
-                                                    <option key={status} value={status}>{status}</option>
-                                                ))}
-                                            </select>
-                                            
-                                            {order.status === "تم التسليم" && order.rating && (
-                                                <span className="text-yellow-500 font-bold text-sm">التقييم: {order.rating} ⭐</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setActiveTab("orders")} className={`px-4 py-2 rounded font-bold ${activeTab === 'orders' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}>الطلبات</button>
+                            <button onClick={() => setActiveTab("products")} className={`px-4 py-2 rounded font-bold ${activeTab === 'products' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}>المنتجات</button>
+                            <button onClick={() => setActiveTab("customers")} className={`px-4 py-2 rounded font-bold ${activeTab === 'customers' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}>العملاء والدعم</button>
+                            <button onClick={() => signOut(window.auth)} className="bg-red-50 text-red-600 px-3 rounded font-bold">خروج</button>
                         </div>
+                    </div>
 
-                        {/* إضافة أكلات للمنيو */}
-                        <div>
-                            <div className="bg-white p-6 rounded-lg shadow mb-6 border-t-4 border-teal-500">
-                                <h2 className="text-lg font-bold mb-4">إضافة أكلة للمنيو</h2>
-                                <form onSubmit={handleAddProduct} className="flex flex-col gap-3">
-                                    <input type="text" placeholder="اسم الأكلة" required value={name} onChange={e => setName(e.target.value)} className="px-4 py-2 border rounded-lg" />
-                                    <input type="number" placeholder="السعر" required value={price} onChange={e => setPrice(e.target.value)} className="px-4 py-2 border rounded-lg" />
-                                    <input type="text" placeholder="تفاصيل (اختياري)" value={desc} onChange={e => setDesc(e.target.value)} className="px-4 py-2 border rounded-lg" />
-                                    
-                                    <div className="border rounded-lg p-2 text-sm">
-                                        <label className="block text-gray-600 mb-1">صورة الأكلة (اختياري)</label>
-                                        <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} className="w-full" />
+                    {/* قسم الطلبات */}
+                    {activeTab === "orders" && (
+                        <div className="space-y-4">
+                            {orders.map(order => (
+                                <div key={order.id} className={`p-4 rounded-lg shadow border-r-4 ${order.status === "تم التسليم" || order.status === "تم الإلغاء" ? "bg-gray-50 border-gray-400" : "bg-white border-orange-500"}`}>
+                                    <div className="flex justify-between items-start mb-3 border-b pb-2">
+                                        <div>
+                                            <h3 className="font-bold text-teal-800">{order.customerName} <span className="text-gray-400 text-sm">(طلب #{order.orderNumber})</span></h3>
+                                            <div className="flex gap-2 mt-1">
+                                                <a href={`tel:${order.phone}`} className="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded font-bold">📞 اتصال</a>
+                                                <a href={`https://wa.me/20${order.phone}`} target="_blank" className="bg-green-50 text-green-600 text-xs px-2 py-1 rounded font-bold">💬 واتساب</a>
+                                            </div>
+                                        </div>
+                                        <span className="font-bold text-lg text-orange-600">{order.totalPrice} ج</span>
                                     </div>
+                                    <ul className="text-sm text-gray-600 mb-3">{order.items.map((item, idx) => <li key={idx}>- {item.name}</li>)}</ul>
                                     
-                                    <button type="submit" disabled={uploading} className="bg-teal-600 text-white px-4 py-2 rounded-lg font-bold mt-2">
-                                        {uploading ? "جاري الرفع..." : "إضافة للمنيو"}
-                                    </button>
-                                </form>
-                            </div>
+                                    {order.status !== "تم الإلغاء" ? (
+                                        <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                                            <select value={order.status} onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)} className="bg-white border px-2 py-1 rounded text-sm font-bold text-teal-700">
+                                                {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                            {order.status === "قيد التجهيز" && <button onClick={() => cancelOrder(order.id)} className="text-red-500 text-sm font-bold hover:underline">إلغاء الطلب</button>}
+                                            {order.status === "تم التسليم" && order.rating && <span className="text-yellow-500 font-bold text-sm">قيّم: {order.rating} ⭐</span>}
+                                        </div>
+                                    ) : ( <span className="text-red-500 font-bold">❌ تم إلغاء هذا الطلب</span> )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
+                    {/* قسم المنتجات */}
+                    {activeTab === "products" && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <form onSubmit={handleAddProduct} className="bg-white p-6 rounded-lg shadow h-fit border-t-4 border-teal-500 flex flex-col gap-3">
+                                <h2 className="text-lg font-bold">إضافة منتج للمنيو</h2>
+                                <input type="text" placeholder="اسم الأكلة" required value={name} onChange={e=>setName(e.target.value)} className="border p-2 rounded" />
+                                <input type="number" placeholder="السعر" required value={price} onChange={e=>setPrice(e.target.value)} className="border p-2 rounded" />
+                                <input type="text" placeholder="الوصف" value={desc} onChange={e=>setDesc(e.target.value)} className="border p-2 rounded" />
+                                <input type="url" placeholder="رابط الصورة من جوجل" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className="border p-2 rounded" dir="ltr" />
+                                <button type="submit" className="bg-teal-600 text-white p-2 rounded font-bold">إضافة</button>
+                            </form>
                             <div className="space-y-3">
                                 {products.map(p => (
-                                    <div key={p.id} className="bg-white p-3 rounded-lg shadow flex justify-between items-center border-r-4 border-teal-500">
-                                        <div className="flex gap-3 items-center">
-                                            {p.imageUrl && <img src={p.imageUrl} alt={p.name} className="w-12 h-12 rounded object-cover" />}
-                                            <div>
-                                                <h3 className="font-bold text-teal-800">{p.name}</h3>
-                                                <p className="text-gray-500 text-xs">{p.price} ج</p>
-                                            </div>
+                                    <div key={p.id} className="bg-white p-3 rounded shadow flex justify-between items-center">
+                                        <div className="flex gap-3">
+                                            {p.imageUrl && <img src={p.imageUrl} className="w-12 h-12 rounded object-cover" />}
+                                            <div><h3 className="font-bold">{p.name}</h3><p className="text-sm text-gray-500">{p.price} ج</p></div>
                                         </div>
-                                        <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 font-bold text-xl">×</button>
+                                        <button onClick={() => deleteDoc(doc(window.db, "products", p.id))} className="text-red-500 font-bold">×</button>
                                     </div>
                                 ))}
                             </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* قسم العملاء والدعم */}
+                    {activeTab === "customers" && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-white rounded-lg shadow p-4 col-span-1 h-[500px] overflow-y-auto">
+                                <h2 className="font-bold text-gray-800 mb-4 border-b pb-2">قائمة العملاء</h2>
+                                {customers.map(c => (
+                                    <button key={c.uid} onClick={() => setSelectedCustomer(c)} className={`w-full text-right p-3 rounded mb-2 font-bold ${selectedCustomer?.uid === c.uid ? 'bg-teal-100 text-teal-800' : 'bg-gray-50 hover:bg-gray-100'}`}>
+                                        👤 {c.username}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                {selectedCustomer ? (
+                                    <ChatBox currentUserId={user.uid} chatWithId={selectedCustomer.uid} chatWithName={selectedCustomer.username} isAdmin={true} />
+                                ) : ( <div className="h-full flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg border border-dashed">اختر عميلاً لبدء الدردشة</div> )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
 
         // --- لوحة العميل ---
         function CustomerDashboard({ user, username }) {
+            const [activeTab, setActiveTab] = useState("menu"); // menu, cart, support
             const [products, setProducts] = useState([]);
             const [cart, setCart] = useState([]);
             const [myOrders, setMyOrders] = useState([]);
-            const [sending, setSending] = useState(false);
             const [phone, setPhone] = useState("");
 
             useEffect(() => {
-                const unsubProducts = onSnapshot(query(collection(window.db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
-                    setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                const unsubP = onSnapshot(query(collection(window.db, "products"), orderBy("createdAt", "desc")), snap => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                const unsubO = onSnapshot(query(collection(window.db, "orders"), where("userId", "==", user.uid)), snap => {
+                    const sorted = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    setMyOrders(sorted);
                 });
-                const unsubOrders = onSnapshot(query(collection(window.db, "orders"), where("userId", "==", user.uid)), (snapshot) => {
-                    const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setMyOrders(ordersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
-                });
-                return () => { unsubProducts(); unsubOrders(); };
+                return () => { unsubP(); unsubO(); };
             }, [user.uid]);
 
-            const addToCart = (product) => setCart([...cart, product]);
+            const addToCart = (p) => setCart([...cart, p]);
             const removeFromCart = (idx) => setCart(cart.filter((_, i) => i !== idx));
-            const totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
+            const totalPrice = cart.reduce((s, i) => s + i.price, 0);
 
             const handleCheckout = async () => {
-                if (cart.length === 0) return;
-                if (!phone.trim()) {
-                    alert("يرجى كتابة رقم التواصل الخاص بك قبل تأكيد الطلب.");
-                    return;
-                }
-                
-                setSending(true);
-                try {
-                    await addDoc(collection(window.db, "orders"), {
-                        userId: user.uid, customerName: username, phone: phone.trim(), items: cart, totalPrice, status: "قيد التجهيز", createdAt: new Date().toISOString()
-                    });
-                    setCart([]); setPhone(""); alert("تم إرسال طلبك بنجاح!");
-                } catch (error) { alert("حدث خطأ."); }
-                setSending(false);
+                if (cart.length === 0 || !phone.trim()) return alert("أضف أكلات للسلة واكتب رقم التواصل.");
+                const orderNum = Math.floor(10000 + Math.random() * 90000); // رقم طلب مميز
+                await addDoc(collection(window.db, "orders"), {
+                    userId: user.uid, customerName: username, phone: phone.trim(), orderNumber: orderNum, items: cart, totalPrice, status: "قيد التجهيز", createdAt: new Date().toISOString()
+                });
+                setCart([]); alert("تم إرسال طلبك! رقم الطلب: #" + orderNum);
+                setActiveTab("cart");
             };
 
-            const handleRate = async (orderId, ratingValue) => {
-                await updateDoc(doc(window.db, "orders", orderId), { rating: ratingValue });
-            };
+            const cancelOrder = async (id) => { if(confirm("تأكيد الإلغاء؟")) await updateDoc(doc(window.db, "orders", id), { status: "تم الإلغاء" }); };
+            const rateOrder = async (id, rating) => await updateDoc(doc(window.db, "orders", id), { rating });
 
             return (
-                <div className="p-4 md:p-8 max-w-6xl mx-auto relative pb-20">
-                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                <div className="p-4 md:p-8 max-w-6xl mx-auto">
+                    <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                         <h1 className="text-2xl font-bold text-orange-600">أكلات غادة 🍲</h1>
-                        <button onClick={() => signOut(window.auth)} className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold text-sm">خروج</button>
+                        <div className="flex gap-2">
+                            <button onClick={() => setActiveTab("menu")} className={`px-4 py-2 rounded font-bold ${activeTab === 'menu' ? 'bg-orange-500 text-white' : 'bg-gray-200'}`}>المنيو</button>
+                            <button onClick={() => setActiveTab("cart")} className={`px-4 py-2 rounded font-bold ${activeTab === 'cart' ? 'bg-orange-500 text-white' : 'bg-gray-200'}`}>السلة وطلباتي ({cart.length})</button>
+                            <button onClick={() => setActiveTab("support")} className={`px-4 py-2 rounded font-bold ${activeTab === 'support' ? 'bg-orange-500 text-white' : 'bg-gray-200'}`}>الدعم والشكاوى</button>
+                            <button onClick={() => signOut(window.auth)} className="bg-red-50 text-red-600 px-3 rounded font-bold">خروج</button>
+                        </div>
                     </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* قسم المنيو */}
-                        <div className="lg:col-span-2">
-                            <h2 className="text-xl font-bold mb-4 text-gray-800">المنيو الطازج اليوم</h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {products.map(p => (
-                                    <div key={p.id} className="bg-white p-4 rounded-lg shadow flex flex-col border-t-4 border-teal-500 overflow-hidden">
-                                        {p.imageUrl && <img src={p.imageUrl} alt={p.name} className="w-full h-40 object-cover rounded-t-md mb-3" />}
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-lg text-teal-800">{p.name}</h3>
-                                            <p className="text-gray-500 text-sm mb-4">{p.desc}</p>
-                                        </div>
-                                        <div className="flex justify-between items-center mt-auto border-t pt-3">
-                                            <span className="text-xl font-bold text-orange-600">{p.price} ج</span>
-                                            <button onClick={() => addToCart(p)} className="bg-teal-50 text-teal-700 px-3 py-1 rounded-lg font-bold">أضف للسلة</button>
-                                        </div>
+
+                    {/* المنيو */}
+                    {activeTab === "menu" && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                            {products.map(p => (
+                                <div key={p.id} className="bg-white p-4 rounded-lg shadow flex flex-col">
+                                    {p.imageUrl && <img src={p.imageUrl} className="w-full h-40 object-cover rounded mb-3" />}
+                                    <h3 className="font-bold text-lg">{p.name}</h3>
+                                    <p className="text-gray-500 text-sm flex-1">{p.desc}</p>
+                                    <div className="flex justify-between items-center mt-4 pt-3 border-t">
+                                        <span className="font-bold text-orange-600">{p.price} ج</span>
+                                        <button onClick={() => addToCart(p)} className="bg-teal-50 text-teal-700 px-3 py-1 rounded font-bold">أضف للسلة</button>
                                     </div>
-                                ))}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* السلة والطلبات */}
+                    {activeTab === "cart" && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* السلة */}
+                            <div className="bg-white p-6 rounded-lg shadow border-t-4 border-orange-500 h-fit">
+                                <h2 className="text-xl font-bold mb-4">السلة 🛒</h2>
+                                {cart.length === 0 ? <p className="text-gray-500">السلة فارغة</p> : (
+                                    <>
+                                        <ul className="mb-4 space-y-2">
+                                            {cart.map((item, i) => (
+                                                <li key={i} className="flex justify-between bg-gray-50 p-2 rounded">
+                                                    <span>{item.name}</span>
+                                                    <button onClick={() => removeFromCart(i)} className="text-red-500 font-bold">×</button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <div className="font-bold text-lg flex justify-between mb-4"><span>الإجمالي:</span><span>{totalPrice} ج</span></div>
+                                        <input type="tel" required value={phone} onChange={e=>setPhone(e.target.value)} placeholder="رقم التواصل 010..." className="w-full border p-2 rounded mb-4" />
+                                        <button onClick={handleCheckout} className="w-full bg-orange-500 text-white py-2 rounded font-bold">تأكيد الطلب 🚀</button>
+                                    </>
+                                )}
                             </div>
 
-                            {/* طلباتي السابقة (للتقييم) */}
-                            {myOrders.length > 0 && (
-                                <div className="mt-8 border-t pt-6">
-                                    <h2 className="text-xl font-bold mb-4 text-gray-800">طلباتي السابقة وحالة الطلب</h2>
-                                    <div className="space-y-3">
-                                        {myOrders.map(order => (
-                                            <div key={order.id} className={`bg-white p-4 rounded-lg shadow flex flex-col sm:flex-row justify-between items-start sm:items-center border-r-4 ${order.status === "تم التسليم" ? "border-green-500" : "border-orange-500"}`}>
-                                                <div className="mb-2 sm:mb-0">
-                                                    <p className="font-bold text-teal-800">طلب بـ {order.totalPrice} ج</p>
-                                                    <p className="text-sm font-bold text-orange-600">الحالة: {order.status}</p>
-                                                </div>
-                                                {order.status === "تم التسليم" && !order.rating && (
-                                                    <div className="flex gap-1 mt-2 sm:mt-0">
-                                                        <span className="text-sm text-gray-500 ml-2">قيّم طلبك:</span>
-                                                        {[1,2,3,4,5].map(star => (
-                                                            <button key={star} onClick={() => handleRate(order.id, star)} className="text-2xl text-gray-300 hover:text-yellow-500 transition">★</button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                {order.rating && <span className="text-yellow-500 font-bold text-lg">قيّمت بـ {order.rating} ★</span>}
+                            {/* طلباتي */}
+                            <div>
+                                <h2 className="text-xl font-bold mb-4">تتبع طلباتي</h2>
+                                <div className="space-y-4">
+                                    {myOrders.map(order => (
+                                        <div key={order.id} className="bg-white p-4 rounded-lg shadow border-r-4 border-orange-500">
+                                            <div className="flex justify-between mb-2">
+                                                <span className="font-bold">طلب #{order.orderNumber}</span>
+                                                <span className="bg-orange-100 text-orange-800 text-sm px-2 py-1 rounded font-bold">{order.status}</span>
                                             </div>
-                                        ))}
-                                    </div>
+                                            <p className="text-gray-500 text-sm mb-3">الإجمالي: {order.totalPrice} ج</p>
+                                            
+                                            {order.status === "قيد التجهيز" && (
+                                                <button onClick={() => cancelOrder(order.id)} className="text-red-500 text-sm font-bold bg-red-50 px-2 py-1 rounded">إلغاء الطلب</button>
+                                            )}
+                                            {order.status === "تم التسليم" && !order.rating && (
+                                                <div className="flex gap-2">
+                                                    <span className="text-sm">قيّم:</span>
+                                                    {[1,2,3,4,5].map(star => <button key={star} onClick={() => rateOrder(order.id, star)} className="text-xl text-gray-300 hover:text-yellow-500">★</button>)}
+                                                </div>
+                                            )}
+                                            {order.rating && <span className="text-yellow-500 font-bold">التقييم: {order.rating} ⭐</span>}
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
+                            </div>
                         </div>
+                    )}
 
-                        {/* قسم السلة */}
-                        <div className="bg-white p-6 rounded-lg shadow h-fit border-t-4 border-orange-500 sticky top-8">
-                            <h2 className="text-xl font-bold mb-4 flex justify-between"><span>سلة طلباتي 🛒</span> <span className="text-orange-600">{cart.length}</span></h2>
-                            {cart.length === 0 ? <p className="text-gray-500 text-center py-8">السلة فارغة</p> : (
-                                <div>
-                                    <ul className="space-y-2 mb-4">
-                                        {cart.map((item, idx) => (
-                                            <li key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                                                <span className="text-sm">{item.name}</span>
-                                                <button onClick={() => removeFromCart(idx)} className="text-red-400 font-bold">×</button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    <div className="border-t pt-4 font-bold text-lg flex justify-between mb-4"><span>الإجمالي:</span> <span>{totalPrice} ج</span></div>
-                                    
-                                    <div className="mb-4">
-                                        <label className="block text-gray-700 text-sm font-bold mb-2">رقم التواصل (مطلوب للتأكيد)</label>
-                                        <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)} placeholder="010..." className="w-full px-3 py-2 border rounded-lg outline-none focus:border-orange-500" />
-                                    </div>
-
-                                    <button onClick={handleCheckout} disabled={sending} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600">{sending ? "جاري الإرسال..." : "اطلب الآن 🚀"}</button>
-                                </div>
-                            )}
+                    {/* الدعم الفني */}
+                    {activeTab === "support" && (
+                        <div className="max-w-2xl mx-auto">
+                            <ChatBox currentUserId={user.uid} isAdmin={false} />
                         </div>
-                    </div>
-
-                    {/* زر الدعم الفني العائم */}
-                    <div className="fixed bottom-6 right-6 z-50">
-                        {/* يمكنك تغيير الرابط بالأسفل برقم الواتساب الخاص بك هكذا: https://wa.me/201000000000 */}
-                        <a href="https://wa.me/" target="_blank" className="bg-teal-600 text-white px-4 py-3 rounded-full shadow-lg flex items-center justify-center hover:bg-teal-700 transition font-bold text-sm">
-                            💬 تواصل مع الإدارة
-                        </a>
-                    </div>
+                    )}
                 </div>
             );
         }
